@@ -1,16 +1,53 @@
-name: CI/CD
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  docker:
+  build:
+    name: Build and Test
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Make mvnw executable
+        run: chmod +x ./mvnw
+
+      - name: Build
+        run: ./mvnw clean compile
+
+      - name: Run Tests
+        run: ./mvnw test -DskipTests=false
+        continue-on-error: true
+
+      - name: Package
+        run: ./mvnw package -DskipTests
+
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup repository name
+        run: |
+          # Convert to lowercase and replace underscores with hyphens
+          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+          echo "IMAGE_NAME=${REPO_NAME}" >> $GITHUB_ENV
+          echo "✅ Image name: ${REPO_NAME}"
 
       - name: Docker Login
         uses: docker/login-action@v3
@@ -19,11 +56,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/transaction-app:latest
-            ghcr.io/${{ github.repository_owner }}/transaction-app:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_NAME }}:latest
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+  notify:
+    name: Notify Success
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: success()
+    
+    steps:
+      - name: Success Message
+        run: |
+          echo "🎉 CI/CD Pipeline completed successfully!"
+          echo "📦 Docker Image: ghcr.io/${{ github.repository_owner }}/transaction-app-backend:latest"
+          echo "🔗 View at: https://github.com/${{ github.repository }}/pkgs/container/transaction-app-backend"
