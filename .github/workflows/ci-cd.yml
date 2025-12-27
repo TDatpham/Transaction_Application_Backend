@@ -1,40 +1,37 @@
-name: CI/CD
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-and-push:
+  docker:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          
-      - name: Make mvnw executable
-        run: chmod +x ./mvnw
-        
-      - name: Build application
-        run: ./mvnw clean package -DskipTests
-      
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Convert repository name to lowercase
+        id: repo-name
+        run: |
+          # Convert repository name to lowercase
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "REPO_LOWER=${REPO_LOWER}" >> $GITHUB_ENV
+          echo "repo-lower=${REPO_LOWER}" >> $GITHUB_OUTPUT
+
       - name: Docker Login
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Build and Push Docker Image
+
+      - name: Build and Push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/banking-portal:latest
-            ghcr.io/${{ github.repository_owner }}/banking-portal:${{ github.sha }}
+            ghcr.io/${{ env.REPO_LOWER }}:latest
+            ghcr.io/${{ env.REPO_LOWER }}:${{ github.sha }}
