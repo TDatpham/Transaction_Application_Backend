@@ -7,44 +7,45 @@ on:
     branches: [ main ]
 
 env:
-  # Convert repository name to lowercase
-  REPO_NAME: ${{ lower(github.repository) }}
+  REGISTRY: ghcr.io
+  # Tên image cố định, viết thường
+  IMAGE_NAME: transaction-app-backend
 
 jobs:
   build:
-    name: Build and Package
+    name: Build Application
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Make mvnw executable
-        run: chmod +x ./mvnw
-
-      - name: Set up JDK 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build and package (skip tests)
-        run: ./mvnw clean package -DskipTests
+      - name: Make mvnw executable
+        run: chmod +x ./mvnw
+
+      - name: Build with Maven
+        run: ./mvnw -B clean package -DskipTests
 
   docker:
-    name: Build Docker Image
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -54,5 +55,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ env.REPO_NAME }}:latest
-            ghcr.io/${{ env.REPO_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
