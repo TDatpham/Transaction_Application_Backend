@@ -1,390 +1,74 @@
-name: CI/CD Pipeline
+name: CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
-permissions:
-  contents: read
-  packages: write
-  id-token: write
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    branches: [ main ]
 
 jobs:
-  build-and-test:
-    name: Build, Test & Analyze
+  build:
+    name: Build and Test
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
 
-      - name: Setup Executable Permissions
-        run: |
-          # Cấp quyền execute cho các file cần thiết
-          find . -name "mvnw" -exec chmod +x {} \;
-          find . -name "*.sh" -exec chmod +x {} \;
-          ls -la mvnw  # Debug: hiển thị quyền file
+      - name: Make mvnw executable
+        run: chmod +x ./mvnw
 
-      - name: Setup Java Environment
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
           java-version: '17'
-          cache: 'maven'
-          cache-dependency-path: '**/pom.xml'
+          distribution: 'temurin'
+          cache: maven
 
-      - name: Cache Maven Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.m2/repository
-            !~/.m2/repository/**/*.lock
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
+      - name: Build and test
+        run: ./mvnw -B clean verify
 
-      - name: Cache Maven Wrapper
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/wrapper
-          key: ${{ runner.os }}-maven-wrapper-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-wrapper-
-
-      - name: Validate Maven Configuration
-        run: ./mvnw -v
-
-      - name: Build Application
-        run: ./mvnw -B clean compile
-        env:
-          MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120
-
-      - name: Run Tests with Coverage
-        run: |
-          ./mvnw -B test jacoco:report
-        env:
-          MAVEN_OPTS: -Xmx2048m -XX:MaxPermSize=512m
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run Integration Tests
-        run: |
-          ./mvnw -B verify -DskipUnitTests
-        if: success()
-
-      - name: Code Quality Analysis
-        run: |
-          ./mvnw -B checkstyle:check spotbugs:check pmd:check
-        continue-on-error: true  # Cho phép pipeline tiếp tục nếu check quality không pass
-
-      - name: Upload Test Results
+      - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: test-results-${{ github.run_number }}
-          path: |
-            target/surefire-reports/
-            target/failsafe-reports/
-            target/jacoco-report/
-          retention-days: 30
+          name: test-results
+          path: target/surefire-reports/
 
-      - name: Upload Build Artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-jar-${{ github.run_number }}
-          path: target/*.jar
-          retention-days: 7
-
-      - name: SonarQube Analysis
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
-        run: |
-          ./mvnw -B sonar:sonar \
-            -Dsonar.projectKey=${{ github.repository }} \
-            -Dsonar.organization=${{ github.repository_owner }} \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL || 'https://sonarcloud.io' }} \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Code Coverage
-        if: always()
-        uses: codecov/codecov-action@v4
-        with:
-          files: target/site/jacoco/jacoco.xml
-          flags: unittests
-          name: code-coverage
-          fail_ci_if_error: false
-
-  security-scan:
-    name: Security Scan
+  docker:
+    name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Executable Permissions
-        run: chmod +x ./mvnw
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
         with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Run OWASP Dependency Check
-        run: ./mvnw -B org.owasp:dependency-check-maven:check -Dformat=HTML -Dformat=JSON
-        continue-on-error: true
-
-      - name: Upload Security Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-reports-${{ github.run_number }}
-          path: target/dependency-check-report.*
-          retention-days: 90
-
-  build-and-push-docker:
-    name: Build & Push Docker Image
-    runs-on: ubuntu-latest
-    needs: [build-and-test, security-scan]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    
-    outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Executable Permissions
-        run: chmod +x ./mvnw
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Extract Metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
-          flavor: |
-            latest=auto
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:master
-            network=host
-
-      - name: Cache Docker Layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Application Package
-        run: ./mvnw -B clean package -DskipTests -Ddocker.skip=true
+      - name: Make mvnw executable
+        run: chmod +x ./mvnw
 
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build package
+        run: ./mvnw -B clean package -DskipTests
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: false
-          build-args: |
-            BUILD_VERSION=${{ github.run_number }}
-            COMMIT_SHA=${{ github.sha }}
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-
-      - name: Scan Docker Image
-        if: success()
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          docker scan --json ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest > scan-report.json
-        continue-on-error: true
-
-      - name: Upload Docker Scan Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-scan-report-${{ github.run_number }}
-          path: scan-report.json
-          retention-days: 90
-
-  deploy:
-    name: Deploy to Environment
-    runs-on: ubuntu-latest
-    needs: build-and-push-docker
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    environment:
-      name: production
-      url: ${{ secrets.DEPLOYMENT_URL }}
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: application-jar-*
-          path: artifacts/
-
-      - name: Deploy to Kubernetes
-        if: env.KUBECONFIG != ''
-        env:
-          KUBECONFIG: ${{ secrets.KUBECONFIG }}
-        run: |
-          # Update Kubernetes deployment with new image
-          kubectl set image deployment/${{ github.event.repository.name }} \
-            ${{ github.event.repository.name }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -n ${{ github.event.repository.name }}
-          
-          # Wait for rollout to complete
-          kubectl rollout status deployment/${{ github.event.repository.name }} \
-            -n ${{ github.event.repository.name }} \
-            --timeout=300s
-
-      - name: Deploy via SSH
-        if: env.SSH_PRIVATE_KEY != ''
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script: |
-            cd /opt/apps/${{ github.event.repository.name }}
-            docker-compose pull
-            docker-compose up -d
-            docker system prune -f
-
-      - name: Health Check
-        run: |
-          sleep 30
-          curl -f ${{ secrets.DEPLOYMENT_URL }}/health || exit 1
-          curl -f ${{ secrets.DEPLOYMENT_URL }}/actuator/health || exit 1
-        retry-delay: 10s
-        retries: 5
-
-      - name: Notify Success
-        if: success()
-        uses: 8398a7/action-slack@v3
-        with:
-          channel: ${{ secrets.SLACK_CHANNEL }}
-          status: success
-          author_name: GitHub Actions
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  notify:
-    name: Notify Status
-    runs-on: ubuntu-latest
-    needs: [build-and-test, security-scan, build-and-push-docker]
-    if: always()
-    
-    steps:
-      - name: Determine Status
-        id: status
-        run: |
-          if [[ "${{ needs.build-and-test.result }}" == "success" && 
-                "${{ needs.security-scan.result }}" == "success" && 
-                "${{ needs.build-and-push-docker.result }}" == "success" ]]; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          else
-            echo "status=failure" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Send Email Notification
-        if: always()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: |
-            CI/CD Pipeline ${{ steps.status.outputs.status == 'success' && '✅ SUCCESS' || '❌ FAILED' }}: 
-            ${{ github.repository }} #${{ github.run_number }}
-          to: ${{ secrets.NOTIFICATION_EMAILS }}
-          from: GitHub Actions <${{ secrets.MAIL_USERNAME }}>
-          body: |
-            Pipeline execution ${{ steps.status.outputs.status }}!
-            
-            Repository: ${{ github.repository }}
-            Workflow: ${{ github.workflow }}
-            Run Number: #${{ github.run_number }}
-            Commit: ${{ github.sha }}
-            Branch: ${{ github.ref }}
-            Triggered by: ${{ github.actor }}
-            
-            Job Status:
-            - Build & Test: ${{ needs.build-and-test.result }}
-            - Security Scan: ${{ needs.security-scan.result }}
-            - Docker Build: ${{ needs.build-and-push-docker.result }}
-            
-            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            
-            ---
-            This is an automated message from GitHub Actions.
-
-      - name: Update GitHub Status
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: status } = await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.sha,
-              state: '${{ steps.status.outputs.status }}',
-              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: 'CI/CD Pipeline completed',
-              context: 'ci-cd/pipeline'
-            });
-            console.log('Status updated:', status);
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
