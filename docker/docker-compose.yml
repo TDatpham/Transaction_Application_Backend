@@ -3,33 +3,46 @@ version: '3.8'
 services:
   mysql:
     image: mysql:8.0
-    container_name: bankingportal-mysql
-    restart: unless-stopped
+    container_name: banking-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: 1234567890
       MYSQL_DATABASE: bankingapp
-      MYSQL_USER: bankinguser
-      MYSQL_PASSWORD: bankingpass
     ports:
       - "3306:3306"
     volumes:
-      - ./mysql/data:/var/lib/mysql
-      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
-    command: --default-authentication-plugin=mysql_native_password
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p1234567890"]
+      timeout: 20s
+      retries: 10
     networks:
       - banking-network
 
-  redis:
-    image: redis:7-alpine
-    container_name: bankingportal-redis
-    restart: unless-stopped
+  banking-app:
+    build: .
+    container_name: banking-portal-api
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bankingapp
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 1234567890
+      JWT_SECRET: TVqX8nPj7wL2KtG5R9YcF1H3MzW6B4DvN8QaZsX0C7EjI5Og2UyV4bP9rT1W3L6KpX8nMj7wL2KtG5R9YcF1H3MzW6B4DvN8QaZsX0C7EjI5Og2UyV4bP9rT1W3L6K
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: 587
+      SPRING_MAIL_USERNAME: phamthanhdat2003vl1@gmail.com
+      SPRING_MAIL_PASSWORD: wgsjofjsyonazdby
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
     ports:
-      - "6379:6379"
-    volumes:
-      - ./redis/data:/data
-    command: redis-server --appendonly yes
+      - "8180:8180"
     networks:
       - banking-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
 
 networks:
   banking-network:
