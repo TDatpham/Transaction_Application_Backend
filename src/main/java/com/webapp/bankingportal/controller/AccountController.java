@@ -89,7 +89,8 @@ public class AccountController {
                 LoggedinUser.getAccountNumber(),
                 fundTransferRequest.targetAccountNumber(),
                 fundTransferRequest.pin(),
-                fundTransferRequest.amount());
+                fundTransferRequest.amount(),
+                fundTransferRequest.category());
 
         return ResponseEntity.ok(ApiMessages.CASH_TRANSFER_SUCCESS.getMessage());
     }
@@ -392,7 +393,8 @@ public class AccountController {
                     LoggedinUser.getAccountNumber(),
                     fundTransferRequest.targetAccountNumber(),
                     fundTransferRequest.pin(),
-                    fundTransferRequest.amount());
+                    fundTransferRequest.amount(),
+                    fundTransferRequest.category());
             
             cacheService.put(CacheKeyType.IDEMPOTENCY, "processed", 300, idempotencyKey);
             
@@ -423,6 +425,23 @@ public class AccountController {
         String accountNumber = LoggedinUser.getAccountNumber();
         transactionService.sendBankStatementByEmail(accountNumber);
         return ResponseEntity.ok("{\"message\": \"Bank statement sent to your email.\"}");
+    }
+    
+    @GetMapping("/expense-statistics")
+    public ResponseEntity<?> getExpenseStatistics(@RequestParam(required = false) Integer year) {
+        try {
+            String accountNumber = LoggedinUser.getAccountNumber();
+            com.webapp.bankingportal.dto.ExpenseStatisticsDTO statistics = 
+                    transactionService.getExpenseStatistics(accountNumber, year);
+            return ResponseEntity.ok(statistics);
+        } catch (Exception e) {
+            log.error("Failed to get expense statistics", e);
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                        "success", false,
+                        "message", e.getMessage()
+                    ));
+        }
     }
     
     /**

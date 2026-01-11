@@ -8,8 +8,6 @@ import org.springframework.stereotype.Repository;
 import com.webapp.bankingportal.entity.PasswordResetToken;
 import com.webapp.bankingportal.entity.User;
 
-import lombok.val;
-
 @Repository
 public interface PasswordResetTokenRepository extends JpaRepository<PasswordResetToken, Long> {
     Optional<PasswordResetToken> findByToken(String token);
@@ -18,5 +16,4 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
 
     void deleteByToken(String token);
 
-	void save(val resetToken);
 }

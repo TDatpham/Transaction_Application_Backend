@@ -245,8 +245,8 @@ public class AccountServiceImpl implements AccountService {
 
     @Transactional
     @Override
-    public void fundTransfer(String sourceAccountNumber, String targetAccountNumber, String pin, double amount) {
-        log.info("Fund transfer request from account: {} to account: {}, amount: {}", sourceAccountNumber, targetAccountNumber, amount);
+    public void fundTransfer(String sourceAccountNumber, String targetAccountNumber, String pin, double amount, String category) {
+        log.info("Fund transfer request from account: {} to account: {}, amount: {}, category: {}", sourceAccountNumber, targetAccountNumber, amount, category);
         validatePin(sourceAccountNumber, pin);
         validateAmount(amount);
 
@@ -283,8 +283,9 @@ public class AccountServiceImpl implements AccountService {
         transaction.setTransactionDate(new Date());
         transaction.setSourceAccount(sourceAccount);
         transaction.setTargetAccount(targetAccount);
+        transaction.setCategory(category);
         transactionRepository.save(transaction);
-        log.info("Fund transfer successful from account: {} to account: {}, amount: {}", sourceAccountNumber, targetAccountNumber, amount);
+        log.info("Fund transfer successful from account: {} to account: {}, amount: {}, category: {}", sourceAccountNumber, targetAccountNumber, amount, category);
     }
 
 }

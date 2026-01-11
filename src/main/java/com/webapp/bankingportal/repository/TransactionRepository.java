@@ -7,13 +7,10 @@ import org.springframework.stereotype.Repository;
 
 import com.webapp.bankingportal.entity.Transaction;
 
-import lombok.val;
-
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
     // Add any custom query methods here, if needed
-	
-    List<Transaction> findBySourceAccount_AccountNumberOrTargetAccount_AccountNumber(String sourceAccountNumber, String targetAccountNumber);
 
-	void save(val transaction);
+    List<Transaction> findBySourceAccount_AccountNumberOrTargetAccount_AccountNumber(String sourceAccountNumber,
+            String targetAccountNumber);
 }

@@ -31,6 +31,8 @@ public class Transaction {
     @JoinColumn(name = "target_account_id")
     private Account targetAccount;
 
+    private String category;
+
     public Transaction() {
     }
 
@@ -80,6 +82,14 @@ public class Transaction {
 
     public void setTargetAccount(Account targetAccount) {
         this.targetAccount = targetAccount;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 
     @Override

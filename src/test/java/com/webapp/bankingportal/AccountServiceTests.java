@@ -73,7 +73,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_create_pin_with_existing_pin() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(passwordEncoder, userRepository, accountService);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(
+                passwordEncoder, userRepository, accountService);
 
         Assertions.assertThrows(UnauthorizedException.class, () -> {
             accountService.createPin(accountDetails.get("accountNumber"), accountDetails.get("password"),
@@ -120,7 +121,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_update_pin_with_valid_details() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(passwordEncoder, userRepository, accountService);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(
+                passwordEncoder, userRepository, accountService);
 
         String newPin = getRandomPin();
 
@@ -142,7 +144,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_update_pin_with_incorrect_password() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(passwordEncoder, userRepository, accountService);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(
+                passwordEncoder, userRepository, accountService);
 
         Assertions.assertThrows(UnauthorizedException.class, () -> {
             accountService.updatePin(accountDetails.get("accountNumber"), accountDetails.get("pin"),
@@ -152,7 +155,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_update_pin_with_missing_or_empty_password() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(passwordEncoder, userRepository, accountService);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(
+                passwordEncoder, userRepository, accountService);
 
         Assertions.assertThrows(UnauthorizedException.class, () -> {
             accountService.updatePin(accountDetails.get("accountNumber"), accountDetails.get("pin"), null,
@@ -167,7 +171,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_update_pin_with_incorrect_pin() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(passwordEncoder, userRepository, accountService);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(
+                passwordEncoder, userRepository, accountService);
 
         Assertions.assertThrows(UnauthorizedException.class, () -> {
             accountService.updatePin(accountDetails.get("accountNumber"), getRandomPin(),
@@ -187,7 +192,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_update_pin_with_missing_or_empty_old_pin() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(passwordEncoder, userRepository, accountService);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(
+                passwordEncoder, userRepository, accountService);
 
         Assertions.assertThrows(UnauthorizedException.class, () -> {
             accountService.updatePin(accountDetails.get("accountNumber"), null, accountDetails.get("password"),
@@ -202,7 +208,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_update_pin_with_missing_or_empty_new_pin() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(passwordEncoder, userRepository, accountService);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(
+                passwordEncoder, userRepository, accountService);
 
         Assertions.assertThrows(InvalidPinException.class, () -> {
             accountService.updatePin(accountDetails.get("accountNumber"), accountDetails.get("pin"),
@@ -218,7 +225,8 @@ public class AccountServiceTests extends BaseTest {
     @Test
     public void test_deposit_cash_with_valid_details() {
         double balance = 1000.0;
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithInitialBalance(balance);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithInitialBalance(
+                balance);
 
         com.webapp.bankingportal.entity.Account account = accountRepository
                 .findByAccountNumber(accountDetails.get("accountNumber"));
@@ -235,7 +243,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_deposit_cash_with_invalid_pin() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(passwordEncoder, userRepository, accountService);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(
+                passwordEncoder, userRepository, accountService);
 
         Assertions.assertThrows(UnauthorizedException.class, () -> {
             accountService.cashDeposit(accountDetails.get("accountNumber"), getRandomPin(), 50.0);
@@ -244,7 +253,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_deposit_invalid_amount() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(passwordEncoder, userRepository, accountService);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithPin(
+                passwordEncoder, userRepository, accountService);
 
         // Negative amount
         Assertions.assertThrows(InvalidAmountException.class, () -> {
@@ -270,7 +280,8 @@ public class AccountServiceTests extends BaseTest {
     @Test
     public void test_withdraw_cash_with_valid_details() {
         double balance = 1000.0;
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithInitialBalance(balance);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithInitialBalance(
+                balance);
 
         double withdrawalAmount = 500.0;
         accountService.cashWithdrawal(accountDetails.get("accountNumber"), accountDetails.get("pin"), withdrawalAmount);
@@ -283,7 +294,8 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_withdraw_insufficient_balance() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithInitialBalance(500.0);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithInitialBalance(
+                500.0);
 
         Assertions.assertThrows(InsufficientBalanceException.class, () -> {
             accountService.cashWithdrawal(accountDetails.get("accountNumber"), accountDetails.get("pin"), 1000.0);
@@ -293,14 +305,16 @@ public class AccountServiceTests extends BaseTest {
     @Test
     public void test_transfer_funds_with_valid_accounts() {
         double sourceAccountBalance = 1000.0;
-        java.util.HashMap<String, String> sourceAccountDetails = (HashMap<String, String>) createAccountWithInitialBalance(sourceAccountBalance);
+        java.util.HashMap<String, String> sourceAccountDetails = (HashMap<String, String>) createAccountWithInitialBalance(
+                sourceAccountBalance);
 
         double targetAccountBalance = 500.0;
-        java.util.HashMap<String, String> targetAccountDetails = (HashMap<String, String>) createAccountWithInitialBalance(targetAccountBalance);
+        java.util.HashMap<String, String> targetAccountDetails = (HashMap<String, String>) createAccountWithInitialBalance(
+                targetAccountBalance);
 
         int transferAmount = 200;
         accountService.fundTransfer(sourceAccountDetails.get("accountNumber"),
-                targetAccountDetails.get("accountNumber"), sourceAccountDetails.get("pin"), transferAmount);
+                targetAccountDetails.get("accountNumber"), sourceAccountDetails.get("pin"), transferAmount, null);
 
         com.webapp.bankingportal.entity.Account sourceAccount = accountRepository
                 .findByAccountNumber(sourceAccountDetails.get("accountNumber"));
@@ -314,23 +328,25 @@ public class AccountServiceTests extends BaseTest {
 
     @Test
     public void test_transfer_non_existent_target_account() {
-        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithInitialBalance(500.0);
+        java.util.HashMap<String, String> accountDetails = (HashMap<String, String>) createAccountWithInitialBalance(
+                500.0);
 
         Assertions.assertThrows(NotFoundException.class, () -> {
             accountService.fundTransfer(accountDetails.get("accountNumber"), getRandomAccountNumber(),
-                    accountDetails.get("pin"), 1000.0);
+                    accountDetails.get("pin"), 1000.0, null);
         });
     }
 
     @Test
     public void test_transfer_funds_insufficient_balance() {
-        java.util.HashMap<String, String> sourceAccountDetails = (HashMap<String, String>) createAccountWithInitialBalance(500.0);
+        java.util.HashMap<String, String> sourceAccountDetails = (HashMap<String, String>) createAccountWithInitialBalance(
+                500.0);
 
         java.util.HashMap<String, String> targetAccountDetails = (HashMap<String, String>) createAccount();
 
         Assertions.assertThrows(InsufficientBalanceException.class, () -> {
             accountService.fundTransfer(sourceAccountDetails.get("accountNumber"),
-                    targetAccountDetails.get("accountNumber"), sourceAccountDetails.get("pin"), 1000.0);
+                    targetAccountDetails.get("accountNumber"), sourceAccountDetails.get("pin"), 1000.0, null);
         });
     }
 
